@@ -36,11 +36,14 @@ class PointCloudProcessCFG: #
         self.frameConfig = FrameConfig()
         self.enableStaticClutterRemoval = True
         self.EnergyTop128 = True
-        self.RangeCut= True
+        self.RangeCut= False
         self.outputVelocity = True
         self.outputSNR = True
         self.outputRange = True
         self.outputInMeter = True
+        self.EnergyThrMed = True
+        self.ConstNoPCD = False
+        self.dopplerToLog = False
 
         # 0,1,2 for x,y,z
         dim = 3
@@ -142,17 +145,13 @@ def naive_xyz(virtual_ant, num_tx=3, num_rx=4, fft_size=64): #
     y_vector = np.sqrt(y_vector)
     return x_vector, y_vector, z_vector
 
-def frame2pointcloud(frame,pointCloudProcessCFG):
-    frameConfig = pointCloudProcessCFG.frameConfig
-    reshapedFrame = frameReshape(frame,frameConfig)
-    rangeResult = rangeFFT(reshapedFrame,frameConfig)
-    if pointCloudProcessCFG.enableStaticClutterRemoval:
-        rangeResult = clutter_removal(rangeResult,axis=2)
-    dopplerResult = dopplerFFT(rangeResult,frameConfig)
-
+def frame2pointcloud(dopplerResult, pointCloudProcessCFG):
     dopplerResultSumAllAntenna = np.sum(dopplerResult, axis=(0,1))
-    dopplerResultInDB = np.log10(np.absolute(dopplerResultSumAllAntenna))
-
+    if pointCloudProcessCFG.dopplerToLog:
+        dopplerResultInDB = np.log10(np.absolute(dopplerResultSumAllAntenna))
+    else:
+        dopplerResultInDB = np.absolute(dopplerResultSumAllAntenna)
+    
     if pointCloudProcessCFG.RangeCut: # filter out the bins which are too close or too far from radar
         dopplerResultInDB[:, :25]=-100
         dopplerResultInDB[:, 125:]=-100
@@ -181,7 +180,16 @@ def frame2pointcloud(frame,pointCloudProcessCFG):
     x,y,z = x_vec*R, y_vec*R, z_vec*R
     pointCloud=np.concatenate((x,y,z,V,energy,R))
     pointCloud = np.reshape(pointCloud,(6,-1))
-    pointCloud = pointCloud[:,y_vec!=0]      
+    pointCloud = pointCloud[:,y_vec!=0]
+    pointCloud=np.transpose(pointCloud, (1,0))
+    
+    if pointCloudProcessCFG.EnergyThrMed:
+        idx = np.argwhere(pointCloud[:,4] > np.median(pointCloud[:,4])).flatten()
+        pointCloud = pointCloud[idx]
+
+    if pointCloudProcessCFG.ConstNoPCD:
+        pointCloud=reg_data(pointCloud, 128) # if the points number is greater than 128, just randomly sample 128 points; if the points number is less than 128, randomly duplicate some points
+
     return pointCloud
 
 def reg_data(data, pc_size): #
@@ -214,47 +222,15 @@ if __name__=='__main__':
     for frame_no in range(total_frame_number):
         bin_frame=bin_reader.getNextFrame(pointCloudProcessCFG.frameConfig)
         np_frame=bin2np_frame(bin_frame)
-        pointCloud = frame2pointcloud(np_frame,pointCloudProcessCFG)
-        if pointCloud.shape[0]==0 or pointCloud.shape[1]==0: # in case, there is no point in a cloud
-            q_pointcloud.put(raw_points)
-            collected_frames+=1
-            continue
-        raw_points=np.transpose(pointCloud, (1,0))
-        raw_points[:,:3]=raw_points[:,:3]
-        raw_points=reg_data(raw_points, 128) # if the points number is greater than 128, just randomly sample 128 points; if the points number is less than 128, randomly duplicate some points
+        frameConfig = pointCloudProcessCFG.frameConfig
+        reshapedFrame = frameReshape(np_frame,frameConfig)
+        rangeResult = rangeFFT(reshapedFrame,frameConfig)
+        if pointCloudProcessCFG.enableStaticClutterRemoval:
+            rangeResult = clutter_removal(rangeResult,axis=2)
+        
+        dopplerResult = dopplerFFT(rangeResult,frameConfig)
+        pointCloud = frame2pointcloud(dopplerResult, pointCloudProcessCFG)
         frame_no+=1
-        print('Frame %d:'%(frame_no), raw_points.shape)
-        print(raw_points)
-        raw_poincloud_data_for_plot.append(raw_points)
+        print('Frame %d:'%(frame_no), pointCloud.shape)
+        raw_poincloud_data_for_plot.append(pointCloud)
     bin_reader.close()
-    raw_poincloud_data_for_plot = np.array(raw_poincloud_data_for_plot)
-    raw_poincloud_data_for_plot = raw_poincloud_data_for_plot.reshape(-1,6)
-    x = raw_poincloud_data_for_plot[:, 0]
-    y = raw_poincloud_data_for_plot[:, 1]
-    z = raw_poincloud_data_for_plot[:, 2]
-    D = raw_poincloud_data_for_plot[:, 3]
-    E = raw_poincloud_data_for_plot[:, 4]
-    R = raw_poincloud_data_for_plot[:, 5]
-    plt.boxplot([x, y, z, D, E, R], ['x', 'y', 'z', 'D', 'E', 'R'])
-    plt.show()
-    ax = plt.axes(projection='3d')
-    ax.scatter(x, y, z, c=D, cmap='viridis', linewidth=0.5)
-    ax.set_xlabel('x')
-    ax.set_ylabel('y')
-    ax.set_zlabel('z')
-    plt.title('Pointcloud with different Doppler Value')
-    plt.show()
-    ax = plt.axes(projection='3d')
-    ax.scatter(x, y, z, c=E, cmap='viridis', linewidth=0.5)
-    ax.set_xlabel('x')
-    ax.set_ylabel('y')
-    ax.set_zlabel('z')
-    plt.title('Pointcloud with different Energy Value')
-    plt.show()
-    ax = plt.axes(projection='3d')
-    ax.scatter(x, y, z, c=R, cmap='viridis', linewidth=0.5)
-    ax.set_xlabel('x')
-    ax.set_ylabel('y')
-    ax.set_zlabel('z')
-    plt.title('Pointcloud with different Range Value')
-    plt.show()
