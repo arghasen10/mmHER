@@ -164,7 +164,7 @@ def frame2pointcloud(dopplerResult, pointCloudProcessCFG):
 
     det_peaks_indices = np.argwhere(cfarResult == True)
     R = det_peaks_indices[:,1].astype(np.float64)
-    V = (det_peaks_indices[:,0]-frameConfig.numDopplerBins//2).astype(np.float64)
+    V = (det_peaks_indices[:,0]-FrameConfig().numDopplerBins//2).astype(np.float64)
     if pointCloudProcessCFG.outputInMeter:
         R *= cfg.RANGE_RESOLUTION
         V *= cfg.DOPPLER_RESOLUTION
