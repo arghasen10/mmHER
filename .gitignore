@@ -3,3 +3,6 @@
 **/.ipynb_checkpoints/
 **/*.ipynb
 **/.idea/
+c_impl/
+.vscode/
+**/test*

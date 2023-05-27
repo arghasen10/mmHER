@@ -545,9 +545,6 @@ def process_indiv_vitalsigns(range_indv_bin):
         pVitalSigns_Heart_AbsSpectrum, breathWfmOutUpdated, heartWfmOutUpdated, phasePrevFrame, \
         diffPhaseCorrectionCum, phaseUsedComputationPrev, dataCurr, dataPrev2, dataPrev1
     range_indv_bin = range_indv_bin[rangeBinStartIndex:rangeBinEndIndex]
-    if first_time == 1:
-        # static variables taken from c
-        first_time = 0
     if guiFlag_ClutterRemoval == 1:
         rangeBinIndexPhase = clutter_removal_C(range_indv_bin)
 
@@ -557,7 +554,6 @@ def process_indiv_vitalsigns(range_indv_bin):
     noiseImpulse_Thresh = 1.5
     pDataIn = np.zeros(shape=FIR_FILTER_SIZE)
     # Processing only the maximum phase value 
-
     unwrapPhasePeak, diffPhaseCorrectionCum = unwrap(rangeBinPhase, phasePrevFrame, diffPhaseCorrectionCum)
     phasePrevFrame = rangeBinPhase
     phaseUsedComputation = unwrapPhasePeak - phaseUsedComputationPrev
@@ -565,6 +561,7 @@ def process_indiv_vitalsigns(range_indv_bin):
     dataPrev2 = dataPrev1
     dataPrev1 = dataCurr
     dataCurr = phaseUsedComputation
+    print(dataPrev2, dataPrev1, dataCurr, noiseImpulse_Thresh)
     phaseUsedComputation = filter_RemoveImpulseNoise(dataPrev2, dataPrev1, dataCurr, noiseImpulse_Thresh)
 
     outputFilterBreathOut, pDelayBreath = filter_IIR_BiquadCascade(phaseUsedComputation, pFilterCoefsBreath,
@@ -906,6 +903,7 @@ def process_indiv_vitalsigns(range_indv_bin):
         "breathingRateEst_harmonicEnergy": breathRateEst_HarmonicEnergy,  # heartRateEst_HarmonicEnergy;
         "heartRateEst_harmonicEnergy": heartRateEst_HarmonicEnergy
     }
+    print(VitalSigns_Output)
 
 
 if __name__ == "__main__":
@@ -924,12 +922,13 @@ if __name__ == "__main__":
         np_frame = bin2np_frame(bin_frame)
         frameConfig = pointCloudProcessCFG.frameConfig
         reshapedFrame = frameReshape(np_frame, frameConfig)
-        rangeResult = rangeFFT(reshapedFrame, frameConfig)
-        if pointCloudProcessCFG.enableStaticClutterRemoval:
-            rangeResult = clutter_removal(rangeResult, axis=2)
-
-        dopplerResult = dopplerFFT(rangeResult, frameConfig)
-        pointCloud = frame2pointcloud(dopplerResult, pointCloudProcessCFG)
-        frame_no += 1
-        print('Frame %d:' % frame_no, pointCloud.shape)
-        pcd.append(pointCloud)
+        process_vitalsigns(reshapedFrame)
+        # rangeResult = rangeFFT(reshapedFrame, frameConfig)
+        # if pointCloudProcessCFG.enableStaticClutterRemoval:
+        #     rangeResult = clutter_removal(rangeResult, axis=2)
+        #
+        # dopplerResult = dopplerFFT(rangeResult, frameConfig)
+        # pointCloud = frame2pointcloud(dopplerResult, pointCloudProcessCFG)
+        # frame_no += 1
+        # print('Frame %d:' % frame_no, pointCloud.shape)
+        # pcd.append(pointCloud)
