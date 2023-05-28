@@ -26,6 +26,13 @@ int16_t* sliceArray(const int16_t* arr, int length, int start, int step, int* re
     return sliced_arr;
 }
 
+
+void print(Complex**** data)
+{
+    printf("Value stored in ptr[2][3][127][255]: %f", data[2][3][127][255].imag);
+
+}
+
 int16_t* complexFrame(int16_t* bin_frame){
     int bin_frame_length = FRAME_SIZE / sizeof(int16_t);
     int sliced_length;
@@ -45,7 +52,7 @@ int16_t* complexFrame(int16_t* bin_frame){
     return np_frame;
 }
 
-Complex**** reshapeAndTranspose(const Complex* np_frame, int np_frame_length, int* shape) {
+Complex**** reshape(const Complex* np_frame, int np_frame_length, int* shape) {
     int dim1 = 128;
     int dim2 = 3;
     int dim3 = 4;
@@ -71,6 +78,17 @@ Complex**** reshapeAndTranspose(const Complex* np_frame, int np_frame_length, in
     shape[1] = dim2;
     shape[2] = dim3;
     shape[3] = dim0;
+
+    return frameWithChirp;
+}
+
+Complex**** transpose(Complex**** frameWithChirp, int* shape)
+{
+    int dim1 = shape[0];
+    int dim2 = shape[1];
+    int dim3 = shape[2];
+    int dim0 = shape[3];
+
     Complex**** transposedFrame = (Complex****)malloc(sizeof(Complex***) * dim2);
     for (int i = 0; i < dim2; i++) {
         transposedFrame[i] = (Complex***)malloc(sizeof(Complex**) * dim3);
@@ -127,10 +145,13 @@ FILE* ADCBinFile;
 
         // Reshape and transpose np_frame
         
-        Complex**** frameWithChirp = reshapeAndTranspose(np_frame, np_frame_length, shape);
-        printf("frameWithChirp shape: %d, %d, %d, %d\n", shape[0], shape[1], shape[2], shape[3]);
+        Complex**** frameWithChirp = reshape(np_frame, np_frame_length, shape);
+        Complex**** transposedFrame = transpose(frameWithChirp, shape);
 
-        free(frameWithChirp);
+        printf("frameWithChirp shape: %d, %d, %d, %d\n", shape[0], shape[1], shape[2], shape[3]);
+        print(transposedFrame);
+
+        // free(frameWithChirp);
         free(bin_frame);
         free(np_frame);
         break;
