@@ -1,5 +1,4 @@
-# mmHER
-mmHER: Millimeter Wave RADAR based Human Emotion Recognition System
+# Millimeter Wave Data Capture Scripts
 
 ## Directory Structure
 ```
